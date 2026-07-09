@@ -40,8 +40,8 @@ static DRAM_ATTR const uint8_t n64_axes_idx[ADAPTER_MAX_AXES] =
 
 static DRAM_ATTR const struct ctrl_meta n64_axes_meta[N64_AXES_MAX] =
 {
-    {.size_min = -128, .size_max = 127, .neutral = 0x00, .abs_max = 0x54, .abs_min = 0x54},
-    {.size_min = -128, .size_max = 127, .neutral = 0x00, .abs_max = 0x54, .abs_min = 0x54},
+    {.size_min = -128, .size_max = 127, .neutral = 0x00, .abs_max = 0x56, .abs_min = 0x56},
+    {.size_min = -128, .size_max = 127, .neutral = 0x00, .abs_max = 0x56, .abs_min = 0x56},
 };
 
 static DRAM_ATTR const struct ctrl_meta n64_mouse_axes_meta[N64_AXES_MAX] =
