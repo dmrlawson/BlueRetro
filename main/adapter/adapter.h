@@ -411,6 +411,7 @@ struct ctrl_meta {
     int32_t size_min;
     int32_t size_max;
     int32_t relative;
+    int32_t raw; /* Source value already in output units: no deadzone, no scaling */
 };
 
 struct ctrl_axis {

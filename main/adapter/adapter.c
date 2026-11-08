@@ -105,14 +105,19 @@ static uint32_t adapter_map_from_axis(struct map_cfg * map_cfg) {
                 /* Keep track of source axis type */
                 out->axes[dst_axis_idx].relative = ctrl_input->axes[src_axis_idx].meta->relative;
                 /* Dst is an axis */
-                int32_t deadzone = (int32_t)(((float)map_cfg->perc_deadzone / 10000) * src_abs_max) + ctrl_input->axes[src_axis_idx].meta->deadzone;
+                int32_t raw = ctrl_input->axes[src_axis_idx].meta->raw;
+                int32_t deadzone = raw ? 0 : (int32_t)(((float)map_cfg->perc_deadzone / 10000) * src_abs_max) + ctrl_input->axes[src_axis_idx].meta->deadzone;
                 /* Check if axis over deadzone */
                 if (abs_src_value > deadzone) {
                     int32_t value = abs_src_value - deadzone;
                     int32_t dst_sign = btn_sign(out->axes[dst_axis_idx].meta->polarity, dst);
                     int32_t dst_abs_max = (dst_sign > 0) ? out->axes[dst_axis_idx].meta->abs_max : out->axes[dst_axis_idx].meta->abs_min;
                     float scale, fvalue;
-                    switch (map_cfg->algo & 0xF) {
+                    if (raw) {
+                        /* Source already in destination units, pass it through as is */
+                        scale = 1.0f;
+                    }
+                    else switch (map_cfg->algo & 0xF) {
                         case LINEAR:
                             scale = ((float)dst_abs_max / (src_abs_max - deadzone)) * (((float)map_cfg->perc_max) / 100);
                             break;
