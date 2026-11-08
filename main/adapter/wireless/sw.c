@@ -276,6 +276,17 @@ static const uint32_t sw_brawler64_btns_mask[32] = {
     BIT(SW_PRO_ZR), BIT(SW_PRO_R), 0, 0,
 };
 
+/* 8BitDo N64 Modkit with raw-stick firmware, named "N64 Controller Raw" in Switch mode.
+ * Its stick bytes are the N64 optical encoder counts around 0x7F (the 0x3F report carries
+ * them as byte << 8), which is what an N64 expects, so for N64 output pass them through
+ * 1:1: no calibration, deadzone or scaling. Other report modes and outputs keep the
+ * normal path. */
+static bool sw_n64_raw(struct bt_data *bt_data) {
+    return atomic_test_bit(&bt_data->base.flags[PAD], BT_QUIRK_SW_N64_RAW)
+        && bt_data->base.report_id == 0x3F
+        && wired_adapter.system_id == N64;
+}
+
 static int32_t sw_pad_init(struct bt_data *bt_data) {
     struct bt_hid_sw_ctrl_calib *calib = NULL;
     const uint8_t *axes_idx = sw_axes_idx;
@@ -392,7 +403,20 @@ static int32_t sw_pad_init(struct bt_data *bt_data) {
             meta[axes_idx[i]].deadzone = sw_axes_meta[i].deadzone;
             printf("# %s: no calib, using default\n", __FUNCTION__);
         }
+        meta[axes_idx[i]].raw = 0;
         bt_data->base.axes_cal[i] = 0;
+    }
+
+    if (sw_n64_raw(bt_data)) {
+        for (uint32_t i = 0; i < 2; i++) {
+            /* Values are signed counts; abs_max only matters for axis-to-button thresholds */
+            meta[i].neutral = 0;
+            meta[i].deadzone = 0;
+            meta[i].abs_max = 0x54;
+            meta[i].abs_min = 0x54;
+            meta[i].raw = 1;
+        }
+        printf("# %s: N64 raw stick passthrough\n", __FUNCTION__);
     }
 
     atomic_set_bit(&bt_data->base.flags[PAD], BT_INIT);
@@ -490,7 +514,12 @@ static int32_t sw_hid_to_generic(struct bt_data *bt_data, struct wireless_ctrl *
 
         for (uint32_t i = 0; i < SW_AXES_MAX; i++) {
             ctrl_data->axes[i].meta = &meta[i];
-            if (i & 0x1) {
+            if (meta[i].raw) {
+                /* High byte = 0x7F + encoder count; Y is inverted like the other 0x3F axes */
+                int32_t count = (int32_t)(map->axes[sw_axes_idx[i]] >> 8) - 0x7F;
+                ctrl_data->axes[i].value = (i & 0x1) ? -count : count;
+            }
+            else if (i & 0x1) {
                 ctrl_data->axes[i].value = (~(map->axes[sw_axes_idx[i]] >> 4) & 0xFFF) + 1 - meta[i].neutral;
             }
             else {
