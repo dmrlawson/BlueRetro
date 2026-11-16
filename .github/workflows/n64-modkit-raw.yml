@@ -1,0 +1,63 @@
+name: n64-modkit-raw
+# Builds the N64 firmware of the n64-modkit-raw branch. Pushing a tag named
+# n64-modkit-raw-* also publishes the images as a GitHub release.
+on:
+  push:
+    tags: [ 'n64-modkit-raw-*' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        hw_version: [hw1, hw2]
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/darthcloud/idf-blueretro:v5.5.0_2024-12-02
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    - name: Build with ESP-IDF
+      shell: bash
+      run: |
+        . $IDF_PATH/export.sh
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        rm -fr build
+        echo "$(git describe --always --tags --match 'v*' --dirty) ${{ matrix.hw_version }} n64" | cut -c -31 > version.txt
+        cat version.txt
+        cp configs/${{ matrix.hw_version }}/n64 sdkconfig
+        BR_HW=_${{ matrix.hw_version }} BR_SYS=_n64 idf.py reconfigure build
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: BlueRetro_${{ matrix.hw_version }}_n64
+        path: build/BlueRetro_${{ matrix.hw_version }}_n64.bin
+        if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Download images
+      uses: actions/download-artifact@v4
+      with:
+        merge-multiple: true
+    - name: Publish release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: BlueRetro_*_n64.bin
+        body: |
+          BlueRetro for N64 with raw stick passthrough for the 8BitDo N64 Modkit running
+          the raw-stick firmware (https://github.com/dmrlawson/n64-modkit-raw).
+
+          These are application images for an over-the-air update of an adapter that
+          already runs BlueRetro: use the BlueRetro web config's OTA page or
+          `tools/ota_blueretro.py`. Pick the file for your adapter's hardware (hw1 or hw2).
